@@ -23,16 +23,14 @@ func main() {
     // process the json
     var d interface{}
     json.Unmarshal(body, &d)
-    m := d.(map[string]interface{}) // processes s string json field
+    m := d.(map[string]interface{}) // processes a string json field
 
     // list of game PGNs
     games := m["games"].([]interface{}) // processes a list
 
     // first game:
-    game1 := games[0].(map[string]interface{}) // string map for fields
-    gr := strings.NewReader(game1["pgn"].(string)) // convert pgn field to string reader for PGN function
-
-    fmt.Print(game1["pgn"])
+    recent_game := games[len(games) - 1].(map[string]interface{}) // string map for fields
+    gr := strings.NewReader(recent_game["pgn"].(string)) // convert pgn field to string reader for PGN function
 
     // process the pgn
     pgn, err := chess.PGN(gr)
@@ -45,17 +43,9 @@ func main() {
     game := chess.NewGame(pgn)
     moves := game.Moves()
 
-    // // reverse positions because my white and black pieces are the wrong colors :(
-    // reversedFEN := "RNBQKBNR/PPPPPPPP/8/8/8/8/pppppppp/rnbqkbnr w KQkq - 0 1"
-    // fen, err := chess.FEN(reversedFEN)
-    // if err != nil {
-    //     fmt.Println("fen boofed")
-    //     os.Exit(1)
-    // }
-    // walkthrough := chess.NewGame(fen)
-
     // Create new game from the reversed position
     walkthrough := chess.NewGame()
+    // walkthrough new game and print each move
     fmt.Println(walkthrough.Position().Board().Draw())
     for i, move := range moves {
         err := walkthrough.Move(move)
@@ -64,7 +54,12 @@ func main() {
             os.Exit(1)
         }
         fmt.Println(walkthrough.Position().Board().Draw())
-        if i == 5 { break }
+        if i == 10 {
+            fmt.Print(walkthrough.FEN())
+            break
+        }
     }
+
+    
 }
 
