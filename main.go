@@ -4,11 +4,11 @@ import (
     "github.com/notnil/chess"
     "fmt"
     "net/http"
-    "os"
-    // "os/exec"
+    "os/exec"
     "io"
     "encoding/json"
     "strings"
+    "time"
 )
 
 func main() {
@@ -24,12 +24,14 @@ func LastGamePgn() func(*chess.Game) {
     // hardcoded this month for now
     r, err := http.Get("https://api.chess.com/pub/player/ggumption/games/2025/01")
     if err != nil {
-        fmt.Errorf("api request error: %w", err);
+        err := fmt.Errorf("api request error: %w", err);
+        panic(err)
     }
     defer r.Body.Close()
     body, err := io.ReadAll(r.Body)
     if err != nil {
-        fmt.Errorf("reading json error: %w", err);
+        err := fmt.Errorf("reading json error: %w", err);
+        panic(err)
     }
 
     // process the json
@@ -47,32 +49,72 @@ func LastGamePgn() func(*chess.Game) {
     // process the pgn
     pgn, err := chess.PGN(gr)
     if err != nil {
-        fmt.Errorf("pgn processing error: %w", err);
+        err := fmt.Errorf("pgn processing error: %w", err);
+        panic(err)
     }
 
     return pgn
 }
 
 func BadMoves(last_game_pgn func(*chess.Game)) {
+    // load stockfish
+    stockfish := exec.Command("stockfish")
+    stdin, err := stockfish.StdinPipe()
+    if err != nil {
+        err := fmt.Errorf("error loading stockfish stdin: %w", err)
+        panic(err)
+    }
+    stdout, err := stockfish.StdoutPipe()
+    if err != nil {
+        err := fmt.Errorf("error loading stockfish stdout: %w", err)
+        panic(err)
+    }
+    if err := stockfish.Start(); err != nil {
+        err := fmt.Errorf("error starting stockfish: %w", err)
+        panic(err)
+    }
+    defer stockfish.Wait()
+    defer stockfish.Process.Kill()
+
+    // functions to write and read from stockfish
+	sendCommand := func(cmd string) {
+		if _, err := stdin.Write([]byte(cmd + "\n")); err != nil {
+            err := fmt.Errorf("Failed to send command to Stockfish: %w", err)
+            panic(err)
+		}
+	}
+
+	readOutput := func() string {
+		buf := make([]byte, 2048)
+		n, err := stdout.Read(buf)
+		if err != nil {
+            err := fmt.Errorf("Failed to read Stockfish output: %w", err)
+            panic(err)
+		}
+		return string(buf[:n])
+	}
+
     // load the pgn into a game and get moves
     game := chess.NewGame(last_game_pgn)
     moves := game.Moves()
 
-    // Create new game from the reversed position
+    // Create new game
     walkthrough := chess.NewGame()
     // walkthrough new game and print each move
     fmt.Println(walkthrough.Position().Board().Draw())
     for i, move := range moves {
         err := walkthrough.Move(move)
         if err != nil {
-            fmt.Println("move in walkthrough boofed")
-            os.Exit(1)
+            err := fmt.Errorf("walkthrough move boofed: %w", err)
+            panic(err)
         }
         fmt.Println(walkthrough.Position().Board().Draw())
         if i == 10 {
-            fmt.Print(walkthrough.FEN())
+            sendCommand("position fen " + walkthrough.FEN())
+            sendCommand("go depth 10")
+            time.Sleep(time.Millisecond * 200)
+            fmt.Print(readOutput())
             break
         }
     }
-    
 }
