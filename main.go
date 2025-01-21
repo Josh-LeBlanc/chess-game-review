@@ -13,13 +13,13 @@ import (
 
 func main() {
     // get pgn of my most recent game
-    last_game_pgn := LastGamePgn()
+    last_game_pgn, white := LastGamePgn()
 
     // analyze each move with stockfish and point out my bad moves
-    BadMoves(last_game_pgn)
+    BadMoves(last_game_pgn, white)
 }
 
-func LastGamePgn() func(*chess.Game) {
+func LastGamePgn() (func(*chess.Game), bool) {
     // sample http request with my games from this month
     // hardcoded this month for now
     r, err := http.Get("https://api.chess.com/pub/player/ggumption/games/2025/01")
@@ -53,10 +53,18 @@ func LastGamePgn() func(*chess.Game) {
         panic(err)
     }
 
-    return pgn
+    // retrieve my color
+    var white bool
+    if string(strings.Split(recent_game["pgn"].(string), "White")[1][3:8]) == "Gumpt" {
+        white = true
+    } else {
+        white = false
+    }
+
+    return pgn, white
 }
 
-func BadMoves(last_game_pgn func(*chess.Game)) {
+func BadMoves(last_game_pgn func(*chess.Game), white bool) {
     // load stockfish
     stockfish := exec.Command("stockfish")
     stdin, err := stockfish.StdinPipe()
@@ -94,6 +102,9 @@ func BadMoves(last_game_pgn func(*chess.Game)) {
 		return string(buf[:n])
 	}
 
+    // set stockfish options
+    sendCommand("setoption name Threads value 4")
+
     // load the pgn into a game and get moves
     game := chess.NewGame(last_game_pgn)
     moves := game.Moves()
@@ -101,20 +112,25 @@ func BadMoves(last_game_pgn func(*chess.Game)) {
     // Create new game
     walkthrough := chess.NewGame()
     // walkthrough new game and print each move
-    fmt.Println(walkthrough.Position().Board().Draw())
     for i, move := range moves {
         err := walkthrough.Move(move)
         if err != nil {
             err := fmt.Errorf("walkthrough move boofed: %w", err)
             panic(err)
         }
-        fmt.Println(walkthrough.Position().Board().Draw())
-        if i == 10 {
+        if (i % 2 == 0) != white {
             sendCommand("position fen " + walkthrough.FEN())
             sendCommand("go depth 10")
-            time.Sleep(time.Millisecond * 200)
-            fmt.Print(readOutput())
-            break
+            time.Sleep(time.Millisecond * 250)
+            out := strings.Split(readOutput(), "\n")
+            // check if my move is same as stockfish
+            if fmt.Sprintf("%s", moves[i + 1]) != strings.Split(out[len(out) - 2], " ")[1] {
+                if len(moves) - 2 > i {
+                    fmt.Printf("my move: %s\n", moves[i + 1])
+                }
+                fmt.Printf("stockfish: %s\n", out[len(out) - 2])
+                fmt.Println(walkthrough.Position().Board().Draw())
+            }
         }
     }
 }
