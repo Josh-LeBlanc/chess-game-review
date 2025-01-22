@@ -3,10 +3,11 @@ package display
 import (
     tea "github.com/charmbracelet/bubbletea"
     "github.com/charmbracelet/lipgloss"
+    "github.com/notnil/chess"
 )
 
 type model struct {
-    text string
+    game *chess.Game
 }
 
 func (m model) Init() tea.Cmd {
@@ -25,11 +26,11 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 }
 
 func (m model) View() string {
-    return lipgloss.NewStyle().Foreground(lipgloss.Color("42")).Render(m.text)
+    return lipgloss.NewStyle().Foreground(lipgloss.Color("#ffffff")).Render(m.game.Position().Board().Draw())
 }
 
-func display() {
-    p := tea.NewProgram(model{text: "Hello, TUI!"})
+func Display(game *chess.Game) {
+    p := tea.NewProgram(model{game: game})
     if _, err := p.Run(); err != nil {
         panic(err)
     }
