@@ -1,6 +1,7 @@
 package main
 
 import (
+    "github.com/Josh-LeBlanc/chess-game-review/display"
     "github.com/notnil/chess"
     "fmt"
     "net/http"
@@ -17,6 +18,8 @@ func main() {
 
     // analyze each move with stockfish and point out my bad moves
     BadMoves(last_game_pgn, white)
+
+    display.display()
 }
 
 func LastGamePgn() (func(*chess.Game), bool) {
@@ -107,6 +110,7 @@ func BadMoves(last_game_pgn func(*chess.Game), white bool) {
 
     // load the pgn into a game and get moves
     game := chess.NewGame(last_game_pgn)
+    fmt.Print(game.FEN())
     moves := game.Moves()
 
     // Create new game
@@ -125,10 +129,11 @@ func BadMoves(last_game_pgn func(*chess.Game), white bool) {
             out := strings.Split(readOutput(), "\n")
             // check if my move is same as stockfish
             if fmt.Sprintf("%s", moves[i + 1]) != strings.Split(out[len(out) - 2], " ")[1] {
+                fmt.Printf("move #%v", i);
                 if len(moves) - 2 > i {
                     fmt.Printf("my move: %s\n", moves[i + 1])
                 }
-                fmt.Printf("stockfish: %s\n", out[len(out) - 2])
+                fmt.Printf("stockfish: %s\n", out)
                 fmt.Println(walkthrough.Position().Board().Draw())
             }
         }
