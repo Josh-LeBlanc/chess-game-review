@@ -1,7 +1,7 @@
 package main
 
 import (
-    // "github.com/Josh-LeBlanc/chess-game-review/display"
+    "github.com/Josh-LeBlanc/chess-game-review/display"
     "github.com/notnil/chess"
     "fmt"
     "net/http"
@@ -15,21 +15,21 @@ import (
 
 func main() {
     // get pgn of my most recent game
-    // last_game_pgn, _ := LastGamePgn()
+    last_game_pgn, white := LastGamePgn()
 
     // analyze each move with stockfish and point out my bad moves
-    // BadMoves(last_game_pgn, white)
+    BadMoves(last_game_pgn, white)
 
-    // game := chess.NewGame(last_game_pgn)
-    //
-    // display.Display(game)
+    game := chess.NewGame(last_game_pgn)
+
+    display.Display(game)
 
     // this has saved our month of games in a text file
     SaveMyRecentApiReq()
 }
 
 func LastGamePgn() (func(*chess.Game), bool) {
-    body := MyRecentApiReq()
+    body := ReadMyRecentApiReq()
 
     // process the json
     var d interface{}
@@ -92,7 +92,7 @@ func SaveMyRecentApiReq() {
     }
 }
 
-func ReadMyRecentApiRequest() []byte {
+func ReadMyRecentApiReq() []byte {
     filename := "saved_api_requests/me-" + time.Now().Format("01-06") + ".txt"
 
     body, err := os.ReadFile(filename)
@@ -131,7 +131,7 @@ func BadMoves(last_game_pgn func(*chess.Game), white bool) {
 		}
 	}
 
-	readOutput := func() string {
+	readStockfishOutput := func() string {
 		buf := make([]byte, 2048)
 		n, err := stdout.Read(buf)
 		if err != nil {
@@ -146,7 +146,6 @@ func BadMoves(last_game_pgn func(*chess.Game), white bool) {
 
     // load the pgn into a game and get moves
     game := chess.NewGame(last_game_pgn)
-    fmt.Print(game.FEN())
     moves := game.Moves()
 
     // Create new game
@@ -162,17 +161,18 @@ func BadMoves(last_game_pgn func(*chess.Game), white bool) {
             sendCommand("position fen " + walkthrough.FEN())
             sendCommand("go depth 10")
             time.Sleep(time.Millisecond * 250)
-            out := strings.Split(readOutput(), "\n")
+            out := readStockfishOutput()
+            bestmove := strings.Split(strings.Split(out, "bestmove")[1], " ")[1]
             // check if my move is same as stockfish
-            if fmt.Sprintf("%s", moves[i + 1]) != strings.Split(out[len(out) - 2], " ")[1] {
-                fmt.Printf("move #%v", i);
+            if fmt.Sprintf("%s", moves[i + 1]) != bestmove {
+                fmt.Printf("move #%v\n", i);
                 if len(moves) - 2 > i {
                     fmt.Printf("my move: %s\n", moves[i + 1])
                 }
-                fmt.Printf("stockfish: %s\n", out)
+                fmt.Printf("stockfish: %s\n", bestmove)
                 fmt.Println(walkthrough.Position().Board().Draw())
             }
-            break
+            if i == 10 { break }
         }
     }
 }
