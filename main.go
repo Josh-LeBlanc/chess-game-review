@@ -17,8 +17,6 @@ func main() {
     // get pgn of my most recent game
     // last_game_pgn, _ := LastGamePgn()
 
-
-
     // analyze each move with stockfish and point out my bad moves
     // BadMoves(last_game_pgn, white)
 
@@ -31,19 +29,7 @@ func main() {
 }
 
 func LastGamePgn() (func(*chess.Game), bool) {
-    // sample http request with my games from this month
-    // hardcoded this month for now
-    r, err := http.Get("https://api.chess.com/pub/player/ggumption/games/2025/01")
-    if err != nil {
-        err := fmt.Errorf("api request error: %w", err);
-        panic(err)
-    }
-    defer r.Body.Close()
-    body, err := io.ReadAll(r.Body)
-    if err != nil {
-        err := fmt.Errorf("reading json error: %w", err);
-        panic(err)
-    }
+    body := ApiReq()
 
     // process the json
     var d interface{}
@@ -75,10 +61,11 @@ func LastGamePgn() (func(*chess.Game), bool) {
     return pgn, white
 }
 
-func SaveApiReq() {
+func ApiReq() []byte {
     // sample http request with my games from this month
     // hardcoded this month for now
-    r, err := http.Get("https://api.chess.com/pub/player/ggumption/games/2025/01")
+    my_recent_month_url := "https://api.chess.com/pub/player/ggumption/games/" + time.Now().Format("2006/01")
+    r, err := http.Get(my_recent_month_url)
     if err != nil {
         err := fmt.Errorf("api request error: %w", err);
         panic(err)
@@ -90,35 +77,19 @@ func SaveApiReq() {
         panic(err)
     }
 
-    err = os.WriteFile("saved_api_requests/me-01-25.txt", body, 0644)
+    return body
+}
+
+func SaveApiReq() {
+    body := ApiReq()
+
+    filename := "saved_api_requests/me-" + time.Now().Format("01-06") + ".txt"
+
+    err := os.WriteFile(filename, body, 0644)
     if err != nil {
         err := fmt.Errorf("writing api data file error: %w", err);
         panic(err)
     }
-
-    body, err = os.ReadFile("saved_api_requests/me-01-25.txt")
-    if err != nil {
-        err := fmt.Errorf("reading api data file error: %w", err);
-        panic(err)
-    }
-
-    // process the json
-    var d interface{}
-    json.Unmarshal(body, &d)
-    m := d.(map[string]interface{}) // processes a string json field
-
-    // list of game PGNs
-    games := m["games"].([]interface{}) // processes a list
-
-    // recent game:
-    recent_game := games[len(games) - 1].(map[string]interface{}) // string map for fields
-    gr := strings.NewReader(recent_game["pgn"].(string)) // convert pgn field to string reader for PGN function
-
-    // process the pgn
-    pgn, err := chess.PGN(gr)
-    g := chess.NewGame(pgn)
-    fmt.Println(g.Position().Board().Draw())
-
 }
 
 func BadMoves(last_game_pgn func(*chess.Game), white bool) {
