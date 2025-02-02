@@ -25,11 +25,11 @@ func main() {
     // display.Display(game)
 
     // this has saved our month of games in a text file
-    SaveApiReq()
+    SaveMyRecentApiReq()
 }
 
 func LastGamePgn() (func(*chess.Game), bool) {
-    body := ApiReq()
+    body := MyRecentApiReq()
 
     // process the json
     var d interface{}
@@ -61,7 +61,7 @@ func LastGamePgn() (func(*chess.Game), bool) {
     return pgn, white
 }
 
-func ApiReq() []byte {
+func MyRecentApiReq() []byte {
     // sample http request with my games from this month
     // hardcoded this month for now
     my_recent_month_url := "https://api.chess.com/pub/player/ggumption/games/" + time.Now().Format("2006/01")
@@ -80,8 +80,8 @@ func ApiReq() []byte {
     return body
 }
 
-func SaveApiReq() {
-    body := ApiReq()
+func SaveMyRecentApiReq() {
+    body := MyRecentApiReq()
 
     filename := "saved_api_requests/me-" + time.Now().Format("01-06") + ".txt"
 
@@ -90,6 +90,17 @@ func SaveApiReq() {
         err := fmt.Errorf("writing api data file error: %w", err);
         panic(err)
     }
+}
+
+func ReadMyRecentApiRequest() []byte {
+    filename := "saved_api_requests/me-" + time.Now().Format("01-06") + ".txt"
+
+    body, err := os.ReadFile(filename)
+    if err != nil {
+        err := fmt.Errorf("reading api data file error: %w", err);
+        panic(err)
+    }
+    return body
 }
 
 func BadMoves(last_game_pgn func(*chess.Game), white bool) {
