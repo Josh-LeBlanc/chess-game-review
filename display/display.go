@@ -9,10 +9,11 @@ import (
 )
 
 type model struct {
-    Game *chess.Game
-    Tabs []string
-    TabContent []string
+    game *chess.Game
+    tabs []string
+    tabContent []string
     activeTab int
+    move int
 }
 
 func (m model) Init() tea.Cmd {
@@ -25,12 +26,29 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
         switch msg.String() {
         case "q", "ctrl+c":
             return m, tea.Quit
-        case "right", "l", "n", "tab":
-			m.activeTab = min(m.activeTab+1, len(m.Tabs)-1)
+        case "l", "n", "tab":
+			m.activeTab = min(m.activeTab+1, len(m.tabs)-1)
 			return m, nil
-		case "left", "h", "p", "shift+tab":
+		case "h", "p", "shift+tab":
 			m.activeTab = max(m.activeTab-1, 0)
 			return m, nil
+        case "left":
+            switch m.activeTab {
+            case 0:
+                if m.move > 0 {
+                    m.move--
+                    m.tabContent[0] = m.game.Positions()[m.move].Board().Draw()
+                }
+            }
+            return m, nil
+        case "right":
+            switch m.activeTab {
+            case 0:
+                if m.move < len(m.game.Positions()) - 1 {
+                    m.move++
+                    m.tabContent[0] = m.game.Positions()[m.move].Board().Draw()
+                }
+            }
         }
     }
     return m, nil
@@ -41,9 +59,9 @@ func (m model) View() string {
 
 	var renderedTabs []string
 
-	for i, t := range m.Tabs {
+	for i, t := range m.tabs {
 		var style lipgloss.Style
-		isFirst, isLast, isActive := i == 0, i == len(m.Tabs)-1, i == m.activeTab
+		isFirst, isLast, isActive := i == 0, i == len(m.tabs)-1, i == m.activeTab
 		if isActive {
 			style = activeTabStyle
 		} else {
@@ -66,7 +84,7 @@ func (m model) View() string {
 	row := lipgloss.JoinHorizontal(lipgloss.Top, renderedTabs...)
 	doc.WriteString(row)
 	doc.WriteString("\n")
-	doc.WriteString(windowStyle.Width((lipgloss.Width(row) - windowStyle.GetHorizontalFrameSize())).Render(m.TabContent[m.activeTab]))
+	doc.WriteString(windowStyle.Width((lipgloss.Width(row) - windowStyle.GetHorizontalFrameSize())).Render(m.tabContent[m.activeTab]))
 	return docStyle.Render(doc.String())
 }
 
@@ -91,7 +109,8 @@ var (
 func Display(game *chess.Game) {
     tabs := []string{"Analysis", "Game Selector"}
     tabContent := []string{game.Position().Board().Draw(), "Game Selector Tab"}
-    p := tea.NewProgram(model{Game: game, Tabs: tabs, TabContent: tabContent})
+    move := len(game.Positions()) - 1
+    p := tea.NewProgram(model{game: game, tabs: tabs, tabContent: tabContent, move: move})
     if _, err := p.Run(); err != nil {
         panic(err)
     }

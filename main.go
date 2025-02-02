@@ -25,7 +25,7 @@ func main() {
     display.Display(game)
 
     // this has saved our month of games in a text file
-    SaveMyRecentApiReq()
+    // SaveMyRecentApiReq()
 }
 
 func LastGamePgn() (func(*chess.Game), bool) {
@@ -161,8 +161,12 @@ func BadMoves(last_game_pgn func(*chess.Game), white bool) {
             sendCommand("position fen " + walkthrough.FEN())
             sendCommand("go depth 10")
             time.Sleep(time.Millisecond * 250)
-            out := readStockfishOutput()
-            bestmove := strings.Split(strings.Split(out, "bestmove")[1], " ")[1]
+            out := strings.Split(readStockfishOutput(), "bestmove")
+            for len(out) != 2 {
+                time.Sleep(time.Millisecond * 69)
+                out = strings.Split(readStockfishOutput(), "bestmove")
+            }
+            bestmove := strings.Split(out[1], " ")[1]
             // check if my move is same as stockfish
             if fmt.Sprintf("%s", moves[i + 1]) != bestmove {
                 fmt.Printf("move #%v\n", i);
@@ -172,7 +176,7 @@ func BadMoves(last_game_pgn func(*chess.Game), white bool) {
                 fmt.Printf("stockfish: %s\n", bestmove)
                 fmt.Println(walkthrough.Position().Board().Draw())
             }
-            if i == 10 { break }
+            if i >= 10 { break }
         }
     }
 }
