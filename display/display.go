@@ -37,7 +37,7 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
             case 0:
                 if m.move > 0 {
                     m.move--
-                    m.tabContent[0] = m.game.Positions()[m.move].Board().Draw()
+                    m.tabContent[0] = "\n\n" + m.game.Positions()[m.move].Board().Draw()
                 }
             }
             return m, nil
@@ -46,9 +46,14 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
             case 0:
                 if m.move < len(m.game.Positions()) - 1 {
                     m.move++
-                    m.tabContent[0] = m.game.Positions()[m.move].Board().Draw()
+                    if m.move == len(m.game.Positions()) - 1 {
+                        m.tabContent[0] = m.game.Outcome().String() + "\n\n" + m.game.Positions()[m.move].Board().Draw()
+                    } else {
+                        m.tabContent[0] = "\n\n" + m.game.Positions()[m.move].Board().Draw()
+                    }
                 }
             }
+            return m, nil
         }
     }
     return m, nil
@@ -108,7 +113,7 @@ var (
 
 func Display(game *chess.Game) {
     tabs := []string{"Analysis", "Game Selector"}
-    tabContent := []string{game.Position().Board().Draw(), "Game Selector Tab"}
+    tabContent := []string{game.Outcome().String() + "\n\n" + game.Position().Board().Draw(), "Game Selector Tab"}
     move := len(game.Positions()) - 1
     p := tea.NewProgram(model{game: game, tabs: tabs, tabContent: tabContent, move: move})
     if _, err := p.Run(); err != nil {

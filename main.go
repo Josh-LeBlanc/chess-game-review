@@ -15,10 +15,10 @@ import (
 
 func main() {
     // get pgn of my most recent game
-    last_game_pgn, white := LastGamePgn()
+    last_game_pgn, _ := LastGamePgn()
 
     // analyze each move with stockfish and point out my bad moves
-    BadMoves(last_game_pgn, white)
+    // BadMoves(last_game_pgn, white)
 
     game := chess.NewGame(last_game_pgn)
 
