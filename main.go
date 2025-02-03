@@ -13,22 +13,27 @@ import (
     "time"
 )
 
+type GameMetadata struct {
+    White string
+    Black string
+}
+
 func main() {
     // get pgn of my most recent game
-    last_game_pgn, _ := LastGamePgn()
+    last_game_pgn, md, _ := LastGamePgn()
 
     // analyze each move with stockfish and point out my bad moves
     // BadMoves(last_game_pgn, white)
 
     game := chess.NewGame(last_game_pgn)
 
-    display.Display(game)
+    display.Display(game, md)
 
     // this has saved our month of games in a text file
     // SaveMyRecentApiReq()
 }
 
-func LastGamePgn() (func(*chess.Game), bool) {
+func LastGamePgn() (func(*chess.Game), GameMetadata, bool) {
     body := ReadMyRecentApiReq()
 
     // process the json
@@ -58,7 +63,15 @@ func LastGamePgn() (func(*chess.Game), bool) {
         white = false
     }
 
-    return pgn, white
+    // get game metadata
+    w := recent_game["white"].(map[string]interface{})
+    b := recent_game["black"].(map[string]interface{})
+    md := GameMetadata{
+        White: w["username"].(string) + " (" + w["rating"].(string) + ")", 
+        Black: b["username"].(string) + " (" + b["rating"].(string) + ")",
+    }
+
+    return pgn, md, white
 }
 
 func MyRecentApiReq() []byte {

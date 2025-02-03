@@ -111,7 +111,7 @@ var (
 	windowStyle       = lipgloss.NewStyle().BorderForeground(highlightColor).Padding(2, 0).Align(lipgloss.Center).Border(lipgloss.NormalBorder()).UnsetBorderTop()
 )
 
-func Display(game *chess.Game) {
+func Display(game *chess.Game, md GameMetadata) {
     tabs := []string{"Analysis", "Game Selector"}
     tabContent := []string{game.Outcome().String() + "\n\n" + game.Position().Board().Draw(), "Game Selector Tab"}
     move := len(game.Positions()) - 1
