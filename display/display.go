@@ -1,84 +1,88 @@
 package display
 
 import (
-    tea "github.com/charmbracelet/bubbletea"
-    "github.com/charmbracelet/lipgloss"
-    "github.com/notnil/chess"
+	tea "github.com/charmbracelet/bubbletea"
+	"github.com/charmbracelet/lipgloss"
+	"github.com/notnil/chess"
 
-    "fmt"
-    "strings"
+	"fmt"
+	"strings"
 )
 
 type GameMetadata struct {
-    White string
-    Black string
+	White string
+	Black string
 }
 
 type analysisTab struct {
-    white string
-    black string
-    eval string
-    board string
+	white string
+	black string
+	eval  string
+	board string
 }
 
 func (t analysisTab) printAnalysisTab() string {
-    return fmt.Sprintf("%-20s", "White: " + t.white) + "\n" + fmt.Sprintf("%20s", "Black: " + t.black) + "\n\n" + t.eval + "\n\n" + t.board
+	return fmt.Sprintf("%-30s", "White: "+t.white) + fmt.Sprintf("%30s", "Black: "+t.black) + t.eval + t.board
 }
 
 type model struct {
-    game *chess.Game
-    tabs []string
-    tabContent []string
-    analysisTab analysisTab
-    activeTab int
-    move int
+	game        *chess.Game
+	tabs        []string
+	tabContent  []string
+	analysisTab analysisTab
+	activeTab   int
+	move        int
 }
 
 func (m model) Init() tea.Cmd {
-    return nil
+	return nil
 }
 
 func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
-    switch msg := msg.(type) {
-    case tea.KeyMsg:
-        switch msg.String() {
-        case "q", "ctrl+c":
-            return m, tea.Quit
-        case "l", "n", "tab":
+	switch msg := msg.(type) {
+	case tea.KeyMsg:
+		switch msg.String() {
+		case "q", "ctrl+c":
+			return m, tea.Quit
+		case "l", "n", "tab":
 			m.activeTab = min(m.activeTab+1, len(m.tabs)-1)
 			return m, nil
 		case "h", "p", "shift+tab":
 			m.activeTab = max(m.activeTab-1, 0)
 			return m, nil
-        case "left":
-            switch m.activeTab {
-            case 0:
-                if m.move > 0 {
-                    m.move--
-                    m.tabContent[0] = "\n\n" + m.game.Positions()[m.move].Board().Draw()
-                }
-            }
-            return m, nil
-        case "right":
-            switch m.activeTab {
-            case 0:
-                if m.move < len(m.game.Positions()) - 1 {
-                    m.move++
-                    if m.move == len(m.game.Positions()) - 1 {
-                        m.tabContent[0] = m.game.Outcome().String() + "\n\n" + m.game.Positions()[m.move].Board().Draw()
-                    } else {
-                        m.tabContent[0] = "\n\n" + m.game.Positions()[m.move].Board().Draw()
-                    }
-                }
-            }
-            return m, nil
-        }
-    }
-    return m, nil
+		case "left":
+			switch m.activeTab {
+			case 0:
+				if m.move > 0 {
+					m.move--
+					m.analysisTab.board = m.game.Positions()[m.move].Board().Draw()
+					m.tabContent[0] = m.analysisTab.printAnalysisTab()
+				}
+			}
+			return m, nil
+		case "right":
+			switch m.activeTab {
+			case 0:
+				if m.move < len(m.game.Positions())-1 {
+					m.move++
+					if m.move == len(m.game.Positions())-1 {
+						m.analysisTab.eval = m.game.Outcome().String()
+						m.analysisTab.board = m.game.Positions()[m.move].Board().Draw()
+						m.tabContent[0] = m.analysisTab.printAnalysisTab()
+					} else {
+						m.analysisTab.board = m.game.Positions()[m.move].Board().Draw()
+						m.tabContent[0] = m.analysisTab.printAnalysisTab()
+					}
+				}
+			}
+			return m, nil
+		}
+	}
+	return m, nil
 }
 
 func (m model) View() string {
-    doc := strings.Builder{}
+	doc := strings.Builder{}
 
 	var renderedTabs []string
 
@@ -130,22 +134,22 @@ var (
 )
 
 func Display(game *chess.Game, md GameMetadata) {
-    tabs := []string{"Analysis", "Game Selector"}
-    at := analysisTab{
-        white: md.White,
-        black: md.Black,
-        eval: "todo",
-        board: game.Position().Board().Draw(),
-    }
-    tabContent := []string{
-        at.printAnalysisTab(),
-        "Game Selector Tab",
-    }
-    move := len(game.Positions()) - 1
-    p := tea.NewProgram(model{game: game, tabs: tabs, tabContent: tabContent, analysisTab: at, move: move})
-    if _, err := p.Run(); err != nil {
-        panic(err)
-    }
+	tabs := []string{"Analysis", "Game Selector"}
+	at := analysisTab{
+		white: md.White,
+		black: md.Black,
+		eval:  "todo",
+		board: game.Position().Board().Draw(),
+	}
+	tabContent := []string{
+		at.printAnalysisTab(),
+		"Game Selector Tab",
+	}
+	move := len(game.Positions()) - 1
+	p := tea.NewProgram(model{game: game, tabs: tabs, tabContent: tabContent, analysisTab: at, move: move})
+	if _, err := p.Run(); err != nil {
+		panic(err)
+	}
 }
 
 func max(a, b int) int {
