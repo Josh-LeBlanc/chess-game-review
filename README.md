@@ -10,7 +10,6 @@ stockfish now looks at the best moves at my position and tells me if I did not m
         - make persistent
     - +/- evaluation number (eval command in stockfish)
         - do this when we load the game for each position
-    - use analysisTab struct when updating display
 - list of games from this month in the game selector
 - be able to add new moves and eval them
 ## BROKEN:
