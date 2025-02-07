@@ -5,13 +5,31 @@ import (
     "github.com/charmbracelet/lipgloss"
     "github.com/notnil/chess"
 
+    "fmt"
     "strings"
 )
+
+type GameMetadata struct {
+    White string
+    Black string
+}
+
+type analysisTab struct {
+    white string
+    black string
+    eval string
+    board string
+}
+
+func (t analysisTab) printAnalysisTab() string {
+    return fmt.Sprintf("%-20s", "White: " + t.white) + "\n" + fmt.Sprintf("%20s", "Black: " + t.black) + "\n\n" + t.eval + "\n\n" + t.board
+}
 
 type model struct {
     game *chess.Game
     tabs []string
     tabContent []string
+    analysisTab analysisTab
     activeTab int
     move int
 }
@@ -113,9 +131,18 @@ var (
 
 func Display(game *chess.Game, md GameMetadata) {
     tabs := []string{"Analysis", "Game Selector"}
-    tabContent := []string{game.Outcome().String() + "\n\n" + game.Position().Board().Draw(), "Game Selector Tab"}
+    at := analysisTab{
+        white: md.White,
+        black: md.Black,
+        eval: "todo",
+        board: game.Position().Board().Draw(),
+    }
+    tabContent := []string{
+        at.printAnalysisTab(),
+        "Game Selector Tab",
+    }
     move := len(game.Positions()) - 1
-    p := tea.NewProgram(model{game: game, tabs: tabs, tabContent: tabContent, move: move})
+    p := tea.NewProgram(model{game: game, tabs: tabs, tabContent: tabContent, analysisTab: at, move: move})
     if _, err := p.Run(); err != nil {
         panic(err)
     }

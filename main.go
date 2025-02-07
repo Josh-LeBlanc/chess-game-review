@@ -3,20 +3,15 @@ package main
 import (
     "github.com/Josh-LeBlanc/chess-game-review/display"
     "github.com/notnil/chess"
-    "fmt"
     "net/http"
     "os/exec"
     "io"
+    "fmt"
     "os"
     "encoding/json"
     "strings"
     "time"
 )
-
-type GameMetadata struct {
-    White string
-    Black string
-}
 
 func main() {
     // get pgn of my most recent game
@@ -33,7 +28,7 @@ func main() {
     // SaveMyRecentApiReq()
 }
 
-func LastGamePgn() (func(*chess.Game), GameMetadata, bool) {
+func LastGamePgn() (func(*chess.Game), display.GameMetadata, bool) {
     body := ReadMyRecentApiReq()
 
     // process the json
@@ -66,9 +61,9 @@ func LastGamePgn() (func(*chess.Game), GameMetadata, bool) {
     // get game metadata
     w := recent_game["white"].(map[string]interface{})
     b := recent_game["black"].(map[string]interface{})
-    md := GameMetadata{
-        White: w["username"].(string) + " (" + w["rating"].(string) + ")", 
-        Black: b["username"].(string) + " (" + b["rating"].(string) + ")",
+    md := display.GameMetadata{
+        White: w["username"].(string) + " (" + fmt.Sprintf("%.0f", w["rating"].(float64)) + ")", 
+        Black: b["username"].(string) + " (" + fmt.Sprintf("%.0f", b["rating"].(float64)) + ")",
     }
 
     return pgn, md, white
@@ -145,7 +140,7 @@ func BadMoves(last_game_pgn func(*chess.Game), white bool) {
 	}
 
 	readStockfishOutput := func() string {
-		buf := make([]byte, 2048)
+		buf := make([]byte, 3072)
 		n, err := stdout.Read(buf)
 		if err != nil {
             err := fmt.Errorf("Failed to read Stockfish output: %w", err)
