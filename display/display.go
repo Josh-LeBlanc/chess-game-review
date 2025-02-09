@@ -1,6 +1,9 @@
 package display
 
 import (
+	"os/exec"
+	"time"
+
 	tea "github.com/charmbracelet/bubbletea"
 	"github.com/charmbracelet/lipgloss"
 	"github.com/notnil/chess"
@@ -19,6 +22,7 @@ type analysisTab struct {
 	black string
 	eval  string
 	board string
+	evals []string
 }
 
 func (t analysisTab) printAnalysisTab() string {
@@ -56,6 +60,7 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 				if m.move > 0 {
 					m.move--
 					m.analysisTab.board = m.game.Positions()[m.move].Board().Draw()
+					m.analysisTab.eval = m.analysisTab.evals[m.move]
 					m.tabContent[0] = m.analysisTab.printAnalysisTab()
 				}
 			}
@@ -67,12 +72,11 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 					m.move++
 					if m.move == len(m.game.Positions())-1 {
 						m.analysisTab.eval = m.game.Outcome().String()
-						m.analysisTab.board = m.game.Positions()[m.move].Board().Draw()
-						m.tabContent[0] = m.analysisTab.printAnalysisTab()
 					} else {
-						m.analysisTab.board = m.game.Positions()[m.move].Board().Draw()
-						m.tabContent[0] = m.analysisTab.printAnalysisTab()
+						m.analysisTab.eval = m.analysisTab.evals[m.move]
 					}
+					m.analysisTab.board = m.game.Positions()[m.move].Board().Draw()
+					m.tabContent[0] = m.analysisTab.printAnalysisTab()
 				}
 			}
 			return m, nil
@@ -135,11 +139,14 @@ var (
 
 func Display(game *chess.Game, md GameMetadata) {
 	tabs := []string{"Analysis", "Game Selector"}
+
+	evals := GetGameEvaluations(game)
 	at := analysisTab{
 		white: md.White,
 		black: md.Black,
-		eval:  "todo",
+		eval:  evals[len(game.Positions())-1],
 		board: game.Position().Board().Draw(),
+		evals: evals,
 	}
 	tabContent := []string{
 		at.printAnalysisTab(),
@@ -164,4 +171,68 @@ func min(a, b int) int {
 		return a
 	}
 	return b
+}
+
+func GetGameEvaluations(game *chess.Game) []string {
+	// Initialize stockfish
+	stockfish := exec.Command("stockfish")
+	stdin, err := stockfish.StdinPipe()
+	if err != nil {
+		panic(fmt.Errorf("error loading stockfish stdin: %w", err))
+	}
+	stdout, err := stockfish.StdoutPipe()
+	if err != nil {
+		panic(fmt.Errorf("error loading stockfish stdout: %w", err))
+	}
+	if err := stockfish.Start(); err != nil {
+		panic(fmt.Errorf("error starting stockfish: %w", err))
+	}
+	defer stockfish.Wait()
+	defer stockfish.Process.Kill()
+
+	// Helper functions
+	sendCommand := func(cmd string) {
+		if _, err := stdin.Write([]byte(cmd + "\n")); err != nil {
+			panic(fmt.Errorf("failed to send command to Stockfish: %w", err))
+		}
+	}
+
+	readStockfishOutput := func() string {
+		buf := make([]byte, 3072)
+		n, err := stdout.Read(buf)
+		if err != nil {
+			panic(fmt.Errorf("failed to read Stockfish output: %w", err))
+		}
+		return string(buf[:n])
+	}
+
+	sendCommand("setoption name Threads value 4")
+
+	// Get evaluations for each position
+	positions := game.Positions()
+	evals := make([]string, len(positions))
+
+	for i, pos := range positions {
+		sendCommand("position fen " + pos.String())
+		sendCommand("eval")
+
+		// Wait for and parse evaluation
+		time.Sleep(100 * time.Millisecond)
+		output := readStockfishOutput()
+
+		// Parse the final evaluation line
+		lines := strings.Split(output, "\n")
+		for _, line := range lines {
+			if strings.Contains(line, "Final evaluation") {
+				// Extract the evaluation value
+				if parts := strings.Split(line, " "); len(parts) > 2 {
+					evals[i] = parts[2]
+				}
+				break
+			}
+		}
+	}
+
+	fmt.Println(len(evals), len(positions))
+	return evals
 }

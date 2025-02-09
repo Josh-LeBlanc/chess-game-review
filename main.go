@@ -228,3 +228,67 @@ func BadMoves(last_game_pgn func(*chess.Game), white bool) {
 		}
 	}
 }
+
+func GetGameEvaluations(game *chess.Game) []string {
+	// Initialize stockfish
+	stockfish := exec.Command("stockfish")
+	stdin, err := stockfish.StdinPipe()
+	if err != nil {
+		panic(fmt.Errorf("error loading stockfish stdin: %w", err))
+	}
+	stdout, err := stockfish.StdoutPipe()
+	if err != nil {
+		panic(fmt.Errorf("error loading stockfish stdout: %w", err))
+	}
+	if err := stockfish.Start(); err != nil {
+		panic(fmt.Errorf("error starting stockfish: %w", err))
+	}
+	defer stockfish.Wait()
+	defer stockfish.Process.Kill()
+
+	// Helper functions
+	sendCommand := func(cmd string) {
+		if _, err := stdin.Write([]byte(cmd + "\n")); err != nil {
+			panic(fmt.Errorf("failed to send command to Stockfish: %w", err))
+		}
+	}
+
+	readStockfishOutput := func() string {
+		buf := make([]byte, 3072)
+		n, err := stdout.Read(buf)
+		if err != nil {
+			panic(fmt.Errorf("failed to read Stockfish output: %w", err))
+		}
+		return string(buf[:n])
+	}
+
+	sendCommand("setoption name Threads value 4")
+
+	// Get evaluations for each position
+	positions := game.Positions()
+	evals := make([]string, len(positions))
+
+	for i, pos := range positions {
+		sendCommand("position fen " + pos.String())
+		sendCommand("eval")
+
+		// Wait for and parse evaluation
+		time.Sleep(100 * time.Millisecond)
+		output := readStockfishOutput()
+
+		// Parse the final evaluation line
+		lines := strings.Split(output, "\n")
+		for _, line := range lines {
+			if strings.Contains(line, "Final evaluation") {
+				// Extract the evaluation value
+				if parts := strings.Split(line, " "); len(parts) > 2 {
+					evals[i] = parts[2]
+				}
+				break
+			}
+		}
+	}
+
+	fmt.Println(len(evals), len(positions))
+	return evals
+}
