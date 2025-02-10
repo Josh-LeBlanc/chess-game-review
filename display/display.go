@@ -1,15 +1,14 @@
 package display
 
 import (
+	"fmt"
 	"os/exec"
+	"strings"
 	"time"
 
 	tea "github.com/charmbracelet/bubbletea"
 	"github.com/charmbracelet/lipgloss"
 	"github.com/notnil/chess"
-
-	"fmt"
-	"strings"
 )
 
 type GameMetadata struct {
@@ -137,7 +136,7 @@ var (
 	windowStyle       = lipgloss.NewStyle().BorderForeground(highlightColor).Padding(2, 0).Align(lipgloss.Center).Border(lipgloss.NormalBorder()).UnsetBorderTop()
 )
 
-func Display(game *chess.Game, md GameMetadata) {
+func Display(game *chess.Game, md GameMetadata) error {
 	tabs := []string{"Analysis", "Game Selector"}
 
 	evals := GetGameEvaluations(game)
@@ -157,6 +156,7 @@ func Display(game *chess.Game, md GameMetadata) {
 	if _, err := p.Run(); err != nil {
 		panic(err)
 	}
+	return nil
 }
 
 func max(a, b int) int {

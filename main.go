@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"io"
+	"log"
 	"net/http"
 	"os"
 	"os/exec"
@@ -16,26 +17,31 @@ import (
 )
 
 func main() {
-	// get pgn of my most recent game
-	last_game_pgn, md, _ := LastGamePgn()
+	pgn, md, _, err := LastGamePgn()
+	if err != nil {
+		log.Fatalf("Failed to get last game: %v", err)
+	}
 
-	// analyze each move with stockfish and point out my bad moves
-	// BadMoves(last_game_pgn, white)
-
-	game := chess.NewGame(last_game_pgn)
-
-	display.Display(game, md)
+	game := chess.NewGame(pgn)
+	if err := display.Display(game, md); err != nil {
+		log.Fatalf("Failed to display game: %v", err)
+	}
 
 	// this has saved our month of games in a text file
 	// SaveMyRecentApiReq()
 }
 
-func LastGamePgn() (func(*chess.Game), display.GameMetadata, bool) {
-	body := ReadMyRecentApiReq()
+func LastGamePgn() (func(*chess.Game), display.GameMetadata, bool, error) {
+	body, err := ReadMyRecentApiReq()
+	if err != nil {
+		return nil, display.GameMetadata{}, false, fmt.Errorf("failed to read recent API request: %w", err)
+	}
 
 	// process the json
 	var d interface{}
-	json.Unmarshal(body, &d)
+	if err := json.Unmarshal(body, &d); err != nil {
+		return nil, display.GameMetadata{}, false, fmt.Errorf("failed to unmarshal JSON: %w", err)
+	}
 	m := d.(map[string]interface{}) // processes a string json field
 
 	// list of game PGNs
@@ -48,8 +54,7 @@ func LastGamePgn() (func(*chess.Game), display.GameMetadata, bool) {
 	// process the pgn
 	pgn, err := chess.PGN(gr)
 	if err != nil {
-		err := fmt.Errorf("pgn processing error: %w", err)
-		panic(err)
+		return nil, display.GameMetadata{}, false, fmt.Errorf("failed to process PGN: %w", err)
 	}
 
 	// retrieve my color
@@ -68,49 +73,48 @@ func LastGamePgn() (func(*chess.Game), display.GameMetadata, bool) {
 		Black: b["username"].(string) + " (" + fmt.Sprintf("%.0f", b["rating"].(float64)) + ")",
 	}
 
-	return pgn, md, white
+	return pgn, md, white, nil
 }
 
-func MyRecentApiReq() []byte {
+func MyRecentApiReq() ([]byte, error) {
 	// sample http request with my games from this month
 	// hardcoded this month for now
 	my_recent_month_url := "https://api.chess.com/pub/player/ggumption/games/" + time.Now().Format("2006/01")
 	r, err := http.Get(my_recent_month_url)
 	if err != nil {
-		err := fmt.Errorf("api request error: %w", err)
-		panic(err)
+		return nil, fmt.Errorf("api request error: %w", err)
 	}
 	defer r.Body.Close()
 	body, err := io.ReadAll(r.Body)
 	if err != nil {
-		err := fmt.Errorf("reading json error: %w", err)
-		panic(err)
+		return nil, fmt.Errorf("reading json error: %w", err)
 	}
 
-	return body
+	return body, nil
 }
 
 func SaveMyRecentApiReq() {
-	body := MyRecentApiReq()
+	body, err := MyRecentApiReq()
+	if err != nil {
+		log.Fatalf("Failed to read recent API request: %v", err)
+	}
 
 	filename := "saved_api_requests/me-" + time.Now().Format("01-06") + ".txt"
 
-	err := os.WriteFile(filename, body, 0644)
+	err = os.WriteFile(filename, body, 0644)
 	if err != nil {
-		err := fmt.Errorf("writing api data file error: %w", err)
-		panic(err)
+		log.Fatalf("Failed to write API data file: %v", err)
 	}
 }
 
-func ReadMyRecentApiReq() []byte {
+func ReadMyRecentApiReq() ([]byte, error) {
 	filename := "saved_api_requests/me-" + time.Now().Format("01-06") + ".txt"
 
 	body, err := os.ReadFile(filename)
 	if err != nil {
-		err := fmt.Errorf("reading api data file error: %w", err)
-		panic(err)
+		return nil, fmt.Errorf("reading api data file error: %w", err)
 	}
-	return body
+	return body, nil
 }
 
 func BadMoves(last_game_pgn func(*chess.Game), white bool) {
@@ -227,68 +231,4 @@ func BadMoves(last_game_pgn func(*chess.Game), white bool) {
 			}
 		}
 	}
-}
-
-func GetGameEvaluations(game *chess.Game) []string {
-	// Initialize stockfish
-	stockfish := exec.Command("stockfish")
-	stdin, err := stockfish.StdinPipe()
-	if err != nil {
-		panic(fmt.Errorf("error loading stockfish stdin: %w", err))
-	}
-	stdout, err := stockfish.StdoutPipe()
-	if err != nil {
-		panic(fmt.Errorf("error loading stockfish stdout: %w", err))
-	}
-	if err := stockfish.Start(); err != nil {
-		panic(fmt.Errorf("error starting stockfish: %w", err))
-	}
-	defer stockfish.Wait()
-	defer stockfish.Process.Kill()
-
-	// Helper functions
-	sendCommand := func(cmd string) {
-		if _, err := stdin.Write([]byte(cmd + "\n")); err != nil {
-			panic(fmt.Errorf("failed to send command to Stockfish: %w", err))
-		}
-	}
-
-	readStockfishOutput := func() string {
-		buf := make([]byte, 3072)
-		n, err := stdout.Read(buf)
-		if err != nil {
-			panic(fmt.Errorf("failed to read Stockfish output: %w", err))
-		}
-		return string(buf[:n])
-	}
-
-	sendCommand("setoption name Threads value 4")
-
-	// Get evaluations for each position
-	positions := game.Positions()
-	evals := make([]string, len(positions))
-
-	for i, pos := range positions {
-		sendCommand("position fen " + pos.String())
-		sendCommand("eval")
-
-		// Wait for and parse evaluation
-		time.Sleep(100 * time.Millisecond)
-		output := readStockfishOutput()
-
-		// Parse the final evaluation line
-		lines := strings.Split(output, "\n")
-		for _, line := range lines {
-			if strings.Contains(line, "Final evaluation") {
-				// Extract the evaluation value
-				if parts := strings.Split(line, " "); len(parts) > 2 {
-					evals[i] = parts[2]
-				}
-				break
-			}
-		}
-	}
-
-	fmt.Println(len(evals), len(positions))
-	return evals
 }
