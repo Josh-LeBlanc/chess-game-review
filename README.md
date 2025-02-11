@@ -5,6 +5,10 @@ currently grabs my most recent game on chess.com and prints it with a sssssimple
 ## stockfish
 stockfish now looks at the best moves at my position and tells me if I did not make the best move
 ## todo
+- MAIN PROBLEM: eval'ing each position with stockfish before the game takes way too long.
+    - fix?: at each position just don't display the eval until is is calculated
+        - could cause problems if we go through the game fast, need to make sure we can stop the stockfish eval and go right to the next one
+- MAINER PROBLEM: the eval is literally just not working
 - pretty up the game in the analysis tab
     - our name, opponents name
         - make persistent
